@@ -103,8 +103,8 @@ void RosFriClient::initPubsSubs() {
   joint_cmd_sub_ =
       nh_.subscribe(joint_cmd_topic_, 1, &RosFriClient::joint_cmd_cb, this);
 
-  joint_state_cmd_sub_ =
-      nh_.subscribe(joint_state_cmd_topic_, 1, &RosFriClient::joint_state_cmd_cb, this);
+  joint_state_cmd_sub_ = nh_.subscribe(joint_state_cmd_topic_, 1,
+                                       &RosFriClient::joint_state_cmd_cb, this);
 }
 
 void RosFriClient::spinOnce(const ros::WallDuration &timeout) {
@@ -190,8 +190,8 @@ void RosFriClient::initializeLastCmd() {
   last_cmd->header.stamp = ros::Time::now();
   last_cmd->header.frame_id = joint_state_frame_id_;
   last_cmd->joint_position.insert(
-      last_cmd->joint_position.end(), robotState().getMeasuredJointPosition(),
-      &robotState().getMeasuredJointPosition()[robotState().NUMBER_OF_JOINTS]);
+      last_cmd->joint_position.end(), robotState().getIpoJointPosition(),
+      &robotState().getIpoJointPosition()[robotState().NUMBER_OF_JOINTS]);
   last_cmd_ = last_cmd;
 }
 
