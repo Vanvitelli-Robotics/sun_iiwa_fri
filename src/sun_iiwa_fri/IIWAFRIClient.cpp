@@ -69,8 +69,7 @@ using namespace KUKA::FRI;
 using namespace sun::iiwa::fri;
 
 //******************************************************************************
-RosFriClient::RosFriClient(const ros::NodeHandle &nh)
-    : nh_(nh) {
+RosFriClient::RosFriClient(const ros::NodeHandle &nh) : nh_(nh) {
   nh_.setCallbackQueue(&cb_queue_);
   init();
 }
@@ -88,6 +87,7 @@ void RosFriClient::init() {
 void RosFriClient::updateParameters() {
 
   joint_cmd_topic_ = "iiwa/command/joint_position";
+  joint_state_cmd_topic_ = "iiwa/command/joint_state";
   joint_state_topic_ = "iiwa/state/joint_state";
   monitoring_topic_ = "iiwa/state/monitoring";
   joint_names_ = {"A1", "A2", "A3", "A4", "A5", "A6", "A7"};
@@ -100,7 +100,11 @@ void RosFriClient::initPubsSubs() {
   monitoring_pub_ =
       nh_.advertise<sun_iiwa_fri::Monitoring>(monitoring_topic_, 1);
 
-  joint_cmd_sub_ = nh_.subscribe(joint_cmd_topic_, 1, &RosFriClient::joint_cmd_cb, this);
+  joint_cmd_sub_ =
+      nh_.subscribe(joint_cmd_topic_, 1, &RosFriClient::joint_cmd_cb, this);
+
+  joint_state_cmd_sub_ =
+      nh_.subscribe(joint_state_cmd_topic_, 1, &RosFriClient::joint_state_cmd_cb, this);
 }
 
 void RosFriClient::spinOnce(const ros::WallDuration &timeout) {
@@ -142,7 +146,7 @@ void RosFriClient::pubMonitoring() {
   msg->sample_time = robotState().getSampleTime();
   msg->session_state = robotState().getSessionState();
   msg->cabinet_timestamp = ros::Time(robotState().getTimestampSec(),
-                                robotState().getTimestampNanoSec());
+                                     robotState().getTimestampNanoSec());
   msg->tracking_performance = robotState().getTrackingPerformance();
 
   monitoring_pub_.publish(msg);
@@ -169,10 +173,26 @@ void RosFriClient::pubJointState() {
   joint_state_pub_.publish(msg);
 }
 
-
-void RosFriClient::joint_cmd_cb(const sun_iiwa_fri::IIWACommandConstPtr& msg)
-{
+void RosFriClient::joint_cmd_cb(const sun_iiwa_fri::IIWACommandConstPtr &msg) {
   last_cmd_ = msg;
+}
+
+void RosFriClient::joint_state_cmd_cb(
+    const sensor_msgs::JointStateConstPtr &msg) {
+  sun_iiwa_fri::IIWACommandPtr last_cmd(new sun_iiwa_fri::IIWACommand);
+  last_cmd->header = msg->header;
+  last_cmd->joint_position = msg->position;
+  last_cmd_ = last_cmd;
+}
+
+void RosFriClient::initializeLastCmd() {
+  sun_iiwa_fri::IIWACommandPtr last_cmd(new sun_iiwa_fri::IIWACommand);
+  last_cmd->header.stamp = ros::Time::now();
+  last_cmd->header.frame_id = joint_state_frame_id_;
+  last_cmd->joint_position.insert(
+      last_cmd->joint_position.end(), robotState().getMeasuredJointPosition(),
+      &robotState().getMeasuredJointPosition()[robotState().NUMBER_OF_JOINTS]);
+  last_cmd_ = last_cmd;
 }
 
 //******************************************************************************
@@ -206,17 +226,6 @@ void RosFriClient::onStateChange(ESessionState oldState,
     break;
   }
   }
-}
-
-void RosFriClient::initializeLastCmd()
-{
-  sun_iiwa_fri::IIWACommandPtr last_cmd(new sun_iiwa_fri::IIWACommand);
-  last_cmd->header.stamp = ros::Time::now();
-  last_cmd->header.frame_id = joint_state_frame_id_;
-  last_cmd->joint_position.insert(
-      last_cmd->joint_position.end(), robotState().getMeasuredJointPosition(),
-      &robotState().getMeasuredJointPosition()[robotState().NUMBER_OF_JOINTS]);
-  last_cmd_ = last_cmd;
 }
 
 //******************************************************************************
@@ -262,11 +271,10 @@ void RosFriClient::command() {
   // calculate new offset
   spinOnce();
 
-  if(!last_cmd_)
-  {
+  if (!last_cmd_) {
     initializeLastCmd();
   }
-  
+
   robotCommand().setJointPosition(last_cmd_->joint_position.data());
 
   publishAll();
