@@ -53,6 +53,7 @@ message_runtime
 add_message_files(
   FILES
   Monitoring.msg
+  IIWACommand.msg
 )
 
 ## Generate services in the 'srv' folder

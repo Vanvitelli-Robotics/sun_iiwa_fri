@@ -68,24 +68,9 @@ cost of any service and repair.
 using namespace KUKA::FRI;
 using namespace sun::iiwa::fri;
 
-#define DEFAULT_PORTID 30200
-#define DEFAULT_JOINTMASK 0x8
-#define DEFAULT_FREQUENCY 0.6
-#define DEFAULT_AMPLITUDE 0.2
-#define DEFAULT_FILTER_COEFFICIENT 0.99
-
 //******************************************************************************
 RosFriClient::RosFriClient(const ros::NodeHandle &nh)
-    : nh_(nh), _jointMask(DEFAULT_JOINTMASK), _freqHz(DEFAULT_FREQUENCY),
-      _amplRad(DEFAULT_AMPLITUDE), _filterCoeff(DEFAULT_FILTER_COEFFICIENT),
-      _offset(0.0), _phi(0.0), _stepWidth(0.0) {
-
-  printf("LBRJointSineOverlayClient initialized:\n"
-         "\tjoint mask: 0x%x\n"
-         "\tfrequency (Hz): %f\n"
-         "\tamplitude (rad): %f\n"
-         "\tfilterCoeff: %f\n",
-         _jointMask, _freqHz, _amplRad, _filterCoeff);
+    : nh_(nh) {
   nh_.setCallbackQueue(&cb_queue_);
   init();
 }
@@ -102,6 +87,7 @@ void RosFriClient::init() {
 
 void RosFriClient::updateParameters() {
 
+  joint_cmd_topic_ = "iiwa/command/joint_position";
   joint_state_topic_ = "iiwa/state/joint_state";
   monitoring_topic_ = "iiwa/state/monitoring";
   joint_names_ = {"A1", "A2", "A3", "A4", "A5", "A6", "A7"};
@@ -113,6 +99,8 @@ void RosFriClient::initPubsSubs() {
       nh_.advertise<sensor_msgs::JointState>(joint_state_topic_, 1);
   monitoring_pub_ =
       nh_.advertise<sun_iiwa_fri::Monitoring>(monitoring_topic_, 1);
+
+  joint_cmd_sub_ = nh_.subscribe(joint_cmd_topic_, 1, &RosFriClient::joint_cmd_cb, this);
 }
 
 void RosFriClient::spinOnce(const ros::WallDuration &timeout) {
@@ -181,6 +169,12 @@ void RosFriClient::pubJointState() {
   joint_state_pub_.publish(msg);
 }
 
+
+void RosFriClient::joint_cmd_cb(const sun_iiwa_fri::IIWACommandConstPtr& msg)
+{
+  last_cmd_ = msg;
+}
+
 //******************************************************************************
 void RosFriClient::onStateChange(ESessionState oldState,
                                  ESessionState newState) {
@@ -212,16 +206,17 @@ void RosFriClient::onStateChange(ESessionState oldState,
     break;
   }
   }
+}
 
-  switch (newState) {
-  case MONITORING_READY: {
-    _offset = 0.0;
-    _phi = 0.0;
-    _stepWidth = 2 * M_PI * _freqHz * robotState().getSampleTime();
-    break;
-  }
-  default: { break; }
-  }
+void RosFriClient::initializeLastCmd()
+{
+  sun_iiwa_fri::IIWACommandPtr last_cmd(new sun_iiwa_fri::IIWACommand);
+  last_cmd->header.stamp = ros::Time::now();
+  last_cmd->header.frame_id = joint_state_frame_id_;
+  last_cmd->joint_position.insert(
+      last_cmd->joint_position.end(), robotState().getMeasuredJointPosition(),
+      &robotState().getMeasuredJointPosition()[robotState().NUMBER_OF_JOINTS]);
+  last_cmd_ = last_cmd;
 }
 
 //******************************************************************************
@@ -233,6 +228,7 @@ void RosFriClient::monitor() {
   /*   Place user Client Code here                                           */
   /*                                                                         */
   /***************************************************************************/
+
   publishAll();
 }
 
@@ -247,6 +243,9 @@ void RosFriClient::waitForCommand() {
   /*   Place user Client Code here                                           */
   /*                                                                         */
   /***************************************************************************/
+
+  initializeLastCmd();
+
   publishAll();
 }
 
@@ -261,21 +260,14 @@ void RosFriClient::command() {
   // In command(), the joint angle values have to be set.
   // robotCommand().setJointPosition( newJointValues );
   // calculate new offset
-  double newOffset = _amplRad * sin(_phi);
-  _offset = _offset * _filterCoeff + newOffset * (1.0 - _filterCoeff);
-  _phi += _stepWidth;
-  if (_phi >= 2 * M_PI)
-    _phi -= 2 * M_PI;
-  // add offset to ipo joint position for all masked joints
-  double jointPos[LBRState::NUMBER_OF_JOINTS];
-  memcpy(jointPos, robotState().getIpoJointPosition(),
-         LBRState::NUMBER_OF_JOINTS * sizeof(double));
-  for (int i = 0; i < LBRState::NUMBER_OF_JOINTS; i++) {
-    if (_jointMask & (1 << i)) {
-      jointPos[i] += _offset;
-    }
+  spinOnce();
+
+  if(!last_cmd_)
+  {
+    initializeLastCmd();
   }
-  robotCommand().setJointPosition(jointPos);
+  
+  robotCommand().setJointPosition(last_cmd_->joint_position.data());
 
   publishAll();
 }

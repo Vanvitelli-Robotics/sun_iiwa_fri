@@ -63,6 +63,7 @@ cost of any service and repair.
 #include "friLBRClient.h"
 #include "ros/callback_queue.h"
 #include "ros/ros.h"
+#include "sun_iiwa_fri/IIWACommand.h"
 
 namespace sun::iiwa::fri {
 
@@ -81,17 +82,12 @@ protected:
   ros::Publisher monitoring_pub_;
   std::string monitoring_topic_;
 
+  ros::Subscriber joint_cmd_sub_;
+  std::string joint_cmd_topic_;
+  sun_iiwa_fri::IIWACommandConstPtr last_cmd_;
+
   std::vector<std::string> joint_names_;
   std::string joint_state_frame_id_;
-
-  //
-  int _jointMask;      //!< Bitmask encoding of overlay joints
-  double _freqHz;      //!< sine frequency (Hertz)
-  double _amplRad;     //!< sine amplitude (radians)
-  double _filterCoeff; //!< filter coefficient
-  double _offset;      //!< offset for current interpolation step
-  double _phi;         //!< phase of sine wave
-  double _stepWidth;   //!< stepwidth for sine
 
 public:
   /**
@@ -117,6 +113,10 @@ public:
   void pubMonitoring();
 
   void pubJointState();
+
+  void joint_cmd_cb(const sun_iiwa_fri::IIWACommandConstPtr &msg);
+
+  void initializeLastCmd();
 
   /**
    * \brief Callback for FRI state changes.
