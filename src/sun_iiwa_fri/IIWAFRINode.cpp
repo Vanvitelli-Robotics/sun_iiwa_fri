@@ -1,4 +1,5 @@
 #include "sun_iiwa_fri/IIWAFRINode.h"
+#include "sun_iiwa_fri/check_realtime.h"
 
 using namespace sun::iiwa::fri;
 
@@ -23,6 +24,9 @@ void IIWAFRINode::connect() {
 void IIWAFRINode::disconnect() { app_.disconnect(); }
 
 void IIWAFRINode::run() {
+
+  sun::check_and_set_realtime();
+
   // repeatedly call the step routine to receive and process FRI packets
   bool success = true;
   while (ros::ok() && success) {

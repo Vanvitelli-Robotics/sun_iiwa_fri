@@ -61,10 +61,13 @@ cost of any service and repair.
 #define SUN_IIWA_FRI_CLIENT_H
 
 #include "friLBRClient.h"
+#include "realtime_tools/realtime_publisher.h"
 #include "ros/callback_queue.h"
 #include "ros/ros.h"
-#include "sun_iiwa_fri/IIWACommand.h"
 #include "sensor_msgs/JointState.h"
+#include "sun_iiwa_fri/IIWACommand.h"
+#include "sun_iiwa_fri/Monitoring.h"
+
 
 namespace sun::iiwa::fri {
 
@@ -77,10 +80,10 @@ protected:
   ros::NodeHandle nh_;
   ros::CallbackQueue cb_queue_;
 
-  ros::Publisher joint_state_pub_;
+  std::unique_ptr<realtime_tools::RealtimePublisher<sensor_msgs::JointState>> joint_state_pub_;
   std::string joint_state_topic_;
 
-  ros::Publisher monitoring_pub_;
+  std::unique_ptr<realtime_tools::RealtimePublisher<sun_iiwa_fri::Monitoring>> monitoring_pub_;
   std::string monitoring_topic_;
 
   ros::Subscriber joint_cmd_sub_;
@@ -120,7 +123,7 @@ public:
 
   void joint_cmd_cb(const sun_iiwa_fri::IIWACommandConstPtr &msg);
 
-  void joint_state_cmd_cb(const sensor_msgs::JointStateConstPtr& msg);
+  void joint_state_cmd_cb(const sensor_msgs::JointStateConstPtr &msg);
 
   void initializeLastCmd();
 
