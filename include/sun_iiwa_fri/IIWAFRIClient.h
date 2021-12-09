@@ -67,6 +67,7 @@ cost of any service and repair.
 #include "sensor_msgs/JointState.h"
 #include "sun_iiwa_fri/IIWACommand.h"
 #include "sun_iiwa_fri/Monitoring.h"
+#include "sun_iiwa_fri/discrete_filter.h"
 
 
 namespace sun::iiwa::fri {
@@ -89,6 +90,7 @@ protected:
   ros::Subscriber joint_cmd_sub_;
   std::string joint_cmd_topic_;
   sun_iiwa_fri::IIWACommandConstPtr last_cmd_;
+  sun::DiscreteTimeFilter<double,7> filter_;
 
   ros::Subscriber joint_state_cmd_sub_;
   std::string joint_state_cmd_topic_;
@@ -100,7 +102,7 @@ public:
   /**
    * \brief Constructor.
    */
-  RosFriClient(const ros::NodeHandle &nh);
+  RosFriClient(const ros::NodeHandle &nh, double cut_time_over_Ts = 0.25);
 
   /**
    * \brief Destructor.

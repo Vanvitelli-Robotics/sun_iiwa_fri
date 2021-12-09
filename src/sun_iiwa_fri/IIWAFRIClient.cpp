@@ -66,7 +66,8 @@ using namespace KUKA::FRI;
 using namespace sun::iiwa::fri;
 
 //******************************************************************************
-RosFriClient::RosFriClient(const ros::NodeHandle &nh) : nh_(nh) {
+RosFriClient::RosFriClient(const ros::NodeHandle &nh, double cut_time_over_Ts)
+    : nh_(nh), filter_(cut_time_over_Ts) {
   nh_.setCallbackQueue(&cb_queue_);
   init();
 }
@@ -120,14 +121,14 @@ void RosFriClient::publishAll() {
 
 void RosFriClient::pubMonitoring() {
 
-  if(!monitoring_pub_->trylock())
-  {
+  if (!monitoring_pub_->trylock()) {
     return;
   }
 
   monitoring_pub_->msg_.header.stamp = ros::Time::now();
 
-  monitoring_pub_->msg_.client_command_mode = robotState().getClientCommandMode();
+  monitoring_pub_->msg_.client_command_mode =
+      robotState().getClientCommandMode();
 
   monitoring_pub_->msg_.commanded_joint_position.clear();
   monitoring_pub_->msg_.commanded_joint_position.insert(
@@ -140,11 +141,13 @@ void RosFriClient::pubMonitoring() {
   if (robotState().getIpoJointPosition() != nullptr) {
     monitoring_pub_->msg_.ipo_joint_position.clear();
     monitoring_pub_->msg_.ipo_joint_position.insert(
-        monitoring_pub_->msg_.ipo_joint_position.end(), robotState().getIpoJointPosition(),
+        monitoring_pub_->msg_.ipo_joint_position.end(),
+        robotState().getIpoJointPosition(),
         &robotState().getIpoJointPosition()[robotState().NUMBER_OF_JOINTS]);
   }
 
-  monitoring_pub_->msg_.connection_quality = robotState().getConnectionQuality();
+  monitoring_pub_->msg_.connection_quality =
+      robotState().getConnectionQuality();
   monitoring_pub_->msg_.control_mode = robotState().getControlMode();
   monitoring_pub_->msg_.drive_state = robotState().getDriveState();
   monitoring_pub_->msg_.operation_mode = robotState().getOperationMode();
@@ -152,27 +155,28 @@ void RosFriClient::pubMonitoring() {
   monitoring_pub_->msg_.safety_state = robotState().getSafetyState();
   monitoring_pub_->msg_.sample_time = robotState().getSampleTime();
   monitoring_pub_->msg_.session_state = robotState().getSessionState();
-  monitoring_pub_->msg_.cabinet_timestamp = ros::Time(robotState().getTimestampSec(),
-                                     robotState().getTimestampNanoSec());
-  monitoring_pub_->msg_.tracking_performance = robotState().getTrackingPerformance();
+  monitoring_pub_->msg_.cabinet_timestamp = ros::Time(
+      robotState().getTimestampSec(), robotState().getTimestampNanoSec());
+  monitoring_pub_->msg_.tracking_performance =
+      robotState().getTrackingPerformance();
 
   monitoring_pub_->unlockAndPublish();
 }
 
 void RosFriClient::pubJointState() {
 
-  if(!joint_state_pub_->trylock())
-  {
+  if (!joint_state_pub_->trylock()) {
     return;
   }
 
   joint_state_pub_->msg_.header.stamp = ros::Time::now();
   // msg->header.frame_id = joint_state_frame_id_;
-  //msg->name = joint_names_;
+  // msg->name = joint_names_;
 
   joint_state_pub_->msg_.position.clear();
   joint_state_pub_->msg_.position.insert(
-      joint_state_pub_->msg_.position.end(), robotState().getMeasuredJointPosition(),
+      joint_state_pub_->msg_.position.end(),
+      robotState().getMeasuredJointPosition(),
       &robotState().getMeasuredJointPosition()[robotState().NUMBER_OF_JOINTS]);
 
   joint_state_pub_->msg_.effort.clear();
@@ -207,6 +211,7 @@ void RosFriClient::initializeLastCmd() {
       last_cmd->joint_position.end(), robotState().getIpoJointPosition(),
       &robotState().getIpoJointPosition()[robotState().NUMBER_OF_JOINTS]);
   last_cmd_ = last_cmd;
+  filter_.set_output(last_cmd_->joint_position.data());
 }
 
 //******************************************************************************
@@ -289,7 +294,24 @@ void RosFriClient::command() {
     initializeLastCmd();
   }
 
+  filter_.apply_filter(last_cmd_->joint_position.data());
+
+  // robotCommand().setJointPosition(robotState().getIpoJointPosition());
+
+  // robotCommand().setJointPosition(filter_.get_output_ptr());
   robotCommand().setJointPosition(last_cmd_->joint_position.data());
 
   publishAll();
+
+  // std::cout << "\n===\nfilter:\n";
+  // for(int i=0; i<7; i++)
+  // {
+  //   std::cout << filter_.get_output_ptr()[i] << " ";
+  // }
+  // std::cout << "\ncommand:\n";
+  // for(int i=0; i<7; i++)
+  // {
+  //   std::cout << last_cmd_->joint_position[i] << " ";
+  // }
+  // std::cout << "\n";
 }
