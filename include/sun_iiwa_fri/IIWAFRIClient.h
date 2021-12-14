@@ -85,6 +85,9 @@ protected:
   ros::Publisher monitoring_pub_;
   std::string monitoring_topic_;
 
+  ros::Publisher joint_cmd_repub_;
+  std::string joint_cmd_repub_topic_;
+
   ros::Subscriber joint_cmd_sub_;
   std::string joint_cmd_topic_;
   sun_iiwa_fri::IIWACommandConstPtr last_cmd_;

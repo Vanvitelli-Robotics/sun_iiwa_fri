@@ -87,6 +87,7 @@ void RosFriClient::updateParameters() {
   joint_state_cmd_topic_ = "iiwa/command/joint_state";
   joint_state_topic_ = "iiwa/state/joint_state";
   monitoring_topic_ = "iiwa/state/monitoring";
+  joint_cmd_repub_topic_ = "iiwa/state/commanded_joint";
   joint_names_ = {"A1", "A2", "A3", "A4", "A5", "A6", "A7"};
   joint_state_frame_id_ = "iiwa";
 }
@@ -97,6 +98,9 @@ void RosFriClient::initPubsSubs() {
 
   monitoring_pub_ =
       nh_.advertise<sun_iiwa_fri::Monitoring>(monitoring_topic_, 1);
+
+  joint_cmd_repub_ =
+      nh_.advertise<sun_iiwa_fri::IIWACommand>(joint_cmd_repub_topic_, 1);
 
   joint_cmd_sub_ =
       nh_.subscribe(joint_cmd_topic_, 1, &RosFriClient::joint_cmd_cb, this);
@@ -151,6 +155,13 @@ void RosFriClient::pubMonitoring() {
   msg->tracking_performance = robotState().getTrackingPerformance();
 
   monitoring_pub_.publish(msg);
+  if (last_cmd_) {
+    sun_iiwa_fri::IIWACommandPtr repub_cmd_msg =
+        sun_iiwa_fri::IIWACommandPtr(new sun_iiwa_fri::IIWACommand);
+    *repub_cmd_msg = *last_cmd_;
+    repub_cmd_msg->header.stamp = ros::Time::now();
+    joint_cmd_repub_.publish(repub_cmd_msg);
+  }
 }
 
 void RosFriClient::pubJointState() {
@@ -278,7 +289,7 @@ void RosFriClient::command() {
   // In command(), the joint angle values have to be set.
   // robotCommand().setJointPosition( newJointValues );
   // calculate new offset
-  
+
   spinOnce();
 
   if (!last_cmd_) {
@@ -288,5 +299,4 @@ void RosFriClient::command() {
   robotCommand().setJointPosition(last_cmd_->joint_position.data());
 
   publishAll();
-
 }
