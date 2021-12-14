@@ -61,13 +61,11 @@ cost of any service and repair.
 #define SUN_IIWA_FRI_CLIENT_H
 
 #include "friLBRClient.h"
-#include "realtime_tools/realtime_publisher.h"
 #include "ros/callback_queue.h"
 #include "ros/ros.h"
 #include "sensor_msgs/JointState.h"
 #include "sun_iiwa_fri/IIWACommand.h"
 #include "sun_iiwa_fri/Monitoring.h"
-#include "sun_iiwa_fri/discrete_filter.h"
 
 
 namespace sun::iiwa::fri {
@@ -81,16 +79,15 @@ protected:
   ros::NodeHandle nh_;
   ros::CallbackQueue cb_queue_;
 
-  std::unique_ptr<realtime_tools::RealtimePublisher<sensor_msgs::JointState>> joint_state_pub_;
+  ros::Publisher joint_state_pub_;
   std::string joint_state_topic_;
 
-  std::unique_ptr<realtime_tools::RealtimePublisher<sun_iiwa_fri::Monitoring>> monitoring_pub_;
+  ros::Publisher monitoring_pub_;
   std::string monitoring_topic_;
 
   ros::Subscriber joint_cmd_sub_;
   std::string joint_cmd_topic_;
   sun_iiwa_fri::IIWACommandConstPtr last_cmd_;
-  sun::DiscreteTimeFilter<double,7> filter_;
 
   ros::Subscriber joint_state_cmd_sub_;
   std::string joint_state_cmd_topic_;
@@ -102,7 +99,7 @@ public:
   /**
    * \brief Constructor.
    */
-  RosFriClient(const ros::NodeHandle &nh, double cut_time_over_Ts = 0.25);
+  RosFriClient(const ros::NodeHandle &nh);
 
   /**
    * \brief Destructor.
