@@ -67,7 +67,6 @@ cost of any service and repair.
 #include "sun_iiwa_fri/IIWACommand.h"
 #include "sun_iiwa_fri/Monitoring.h"
 
-
 namespace sun::iiwa::fri {
 
 /**
@@ -77,6 +76,7 @@ class RosFriClient : public KUKA::FRI::LBRClient {
 
 protected:
   ros::NodeHandle nh_;
+  ros::NodeHandle nh_private_;
   ros::CallbackQueue cb_queue_;
 
   ros::Publisher joint_state_pub_;
@@ -98,16 +98,24 @@ protected:
   std::vector<std::string> joint_names_;
   std::string joint_state_frame_id_;
 
+  // sample time in seconds to be checked against the controller
+  // sample time. If -1, no check is performed
+  double sample_time_;
+
 public:
   /**
    * \brief Constructor.
    */
-  RosFriClient(const ros::NodeHandle &nh);
+  RosFriClient(const ros::NodeHandle &nh,
+               const ros::NodeHandle &nh_private = ros::NodeHandle("~"));
 
   /**
    * \brief Destructor.
    */
   ~RosFriClient();
+
+  // check if sample_time_ is the same of the cabinet one
+  void checkSampleTime();
 
   void init();
 

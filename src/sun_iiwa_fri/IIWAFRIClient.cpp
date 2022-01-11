@@ -66,7 +66,9 @@ using namespace KUKA::FRI;
 using namespace sun::iiwa::fri;
 
 //******************************************************************************
-RosFriClient::RosFriClient(const ros::NodeHandle &nh) : nh_(nh) {
+RosFriClient::RosFriClient(const ros::NodeHandle &nh,
+                           const ros::NodeHandle &nh_private)
+    : nh_(nh), nh_private_(nh_private) {
   nh_.setCallbackQueue(&cb_queue_);
   init();
 }
@@ -76,6 +78,17 @@ RosFriClient::~RosFriClient() {}
 
 //******************************************************************************
 
+void RosFriClient::checkSampleTime() {
+  if (sample_time_ < 0.0) {
+    return;
+  }
+  if (sample_time_ != robotState().getSampleTime()) {
+    throw std::runtime_error("sample time mismatch - cabinet sample time is " +
+                             std::to_string(robotState().getSampleTime()) +
+                             ", expected is " + std::to_string(sample_time_));
+  }
+}
+
 void RosFriClient::init() {
   updateParameters();
   initPubsSubs();
@@ -83,13 +96,20 @@ void RosFriClient::init() {
 
 void RosFriClient::updateParameters() {
 
-  joint_cmd_topic_ = "iiwa/command/joint_position";
-  joint_state_cmd_topic_ = "iiwa/command/joint_state";
-  joint_state_topic_ = "iiwa/state/joint_state";
-  monitoring_topic_ = "iiwa/state/monitoring";
-  joint_cmd_repub_topic_ = "iiwa/state/commanded_joint";
+  joint_cmd_topic_ = "command/joint_position";
+  joint_state_cmd_topic_ = "command/joint_state";
+  joint_state_topic_ = "state/joint_state";
+  monitoring_topic_ = "state/monitoring";
+  joint_cmd_repub_topic_ = "state/commanded_joint";
   joint_names_ = {"A1", "A2", "A3", "A4", "A5", "A6", "A7"};
   joint_state_frame_id_ = "iiwa";
+
+  nh_private_.param("sample_time", sample_time_, -1.0);
+
+  if(sample_time_ >= 0.0)
+  {
+    std::cout << "[FRI DRIVER] expected sample time " << sample_time_ << "\n";
+  }
 }
 
 void RosFriClient::initPubsSubs() {
@@ -272,6 +292,8 @@ void RosFriClient::waitForCommand() {
   /*   Place user Client Code here                                           */
   /*                                                                         */
   /***************************************************************************/
+
+  checkSampleTime();
 
   initializeLastCmd();
 
