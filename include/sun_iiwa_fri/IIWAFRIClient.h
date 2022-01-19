@@ -60,12 +60,16 @@ cost of any service and repair.
 #ifndef SUN_IIWA_FRI_CLIENT_H
 #define SUN_IIWA_FRI_CLIENT_H
 
+#include "discrete_filter.h"
 #include "friLBRClient.h"
 #include "ros/callback_queue.h"
 #include "ros/ros.h"
 #include "sensor_msgs/JointState.h"
 #include "sun_iiwa_fri/IIWACommand.h"
 #include "sun_iiwa_fri/Monitoring.h"
+#include <memory>
+
+#define IIWA_NUM_JOINTS 7
 
 namespace sun::iiwa::fri {
 
@@ -91,6 +95,8 @@ protected:
   ros::Subscriber joint_cmd_sub_;
   std::string joint_cmd_topic_;
   sun_iiwa_fri::IIWACommandConstPtr last_cmd_;
+  double filter_cut_time_over_Ts_ = -1.0;
+  std::unique_ptr<sun::DiscreteTimeFilter<double, IIWA_NUM_JOINTS>> filter_;
 
   ros::Subscriber joint_state_cmd_sub_;
   std::string joint_state_cmd_topic_;
@@ -118,7 +124,11 @@ public:
   // check if sample_time_ is the same of the cabinet one
   void checkSampleTime();
 
+  void checkFilter();
+
   void init();
+
+  void init_filter();
 
   void updateParameters();
 

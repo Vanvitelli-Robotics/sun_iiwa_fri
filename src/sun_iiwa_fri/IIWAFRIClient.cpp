@@ -89,10 +89,29 @@ void RosFriClient::checkSampleTime() {
   }
 }
 
+void RosFriClient::checkFilter() {
+  if (filter_) {
+    std::cout << "[FRI DRIVER] Joint Filter Active! - cut time = "
+              << filter_cut_time_over_Ts_ * robotState().getSampleTime()
+              << "\n";
+  } else {
+    std::cout << "[FRI DRIVER] Joint Filter NOT Active!\n";
+  }
+}
+
 void RosFriClient::init() {
   updateParameters();
   initPubsSubs();
+  init_filter();
   init_realtime();
+}
+
+void RosFriClient::init_filter() {
+  if (filter_cut_time_over_Ts_ > 0.0) {
+    filter_ =
+        std::make_unique<sun::DiscreteTimeFilter<double, IIWA_NUM_JOINTS>>(
+            filter_cut_time_over_Ts_);
+  }
 }
 
 void RosFriClient::updateParameters() {
@@ -107,6 +126,7 @@ void RosFriClient::updateParameters() {
 
   nh_private_.param("sample_time", sample_time_, -1.0);
   nh_private_.param("use_realtime", b_use_realtime_, false);
+  nh_private_.param("filter_cut_time_over_Ts", filter_cut_time_over_Ts_, 1.0);
 
   if (sample_time_ >= 0.0) {
     std::cout << "[FRI DRIVER] expected sample time " << sample_time_ << "\n";
@@ -264,6 +284,9 @@ void RosFriClient::initializeLastCmd() {
       last_cmd->joint_position.end(), robotState().getIpoJointPosition(),
       &robotState().getIpoJointPosition()[robotState().NUMBER_OF_JOINTS]);
   last_cmd_ = last_cmd;
+  if (filter_) {
+    filter_->set_output(last_cmd_->joint_position.data());
+  }
 }
 
 //******************************************************************************
@@ -326,6 +349,8 @@ void RosFriClient::waitForCommand() {
 
   checkSampleTime();
 
+  checkFilter();
+
   initializeLastCmd();
 
   publishAll();
@@ -349,7 +374,12 @@ void RosFriClient::command() {
     initializeLastCmd();
   }
 
-  robotCommand().setJointPosition(last_cmd_->joint_position.data());
+  if (filter_) {
+    filter_->apply_filter(last_cmd_->joint_position.data());
+    robotCommand().setJointPosition(filter_->get_output_ptr());
+  } else {
+    robotCommand().setJointPosition(last_cmd_->joint_position.data());
+  }
 
   publishAll();
 }
