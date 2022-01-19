@@ -1,12 +1,13 @@
 #include "sun_iiwa_fri/IIWAFRINode.h"
-#include "sun_iiwa_fri/check_realtime.h"
 
 using namespace sun::iiwa::fri;
 
-IIWAFRINode::IIWAFRINode(const ros::NodeHandle &nh, int udp_port,
+IIWAFRINode::IIWAFRINode(const ros::NodeHandle &nh,
+                         const ros::NodeHandle &nh_params, int udp_port,
                          unsigned int receiveTimeout)
-    : fri_client_(nh), connection_(receiveTimeout), udp_port_(udp_port),
-      app_(connection_, fri_client_) {}
+    : fri_client_(nh, nh_params), connection_(receiveTimeout),
+      udp_port_(udp_port), app_(connection_, fri_client_) {}
+      
 IIWAFRINode::~IIWAFRINode() { disconnect(); }
 
 void IIWAFRINode::connect() {
@@ -23,10 +24,12 @@ void IIWAFRINode::connect() {
 
 void IIWAFRINode::disconnect() { app_.disconnect(); }
 
+void IIWAFRINode::run_init() { fri_client_.init(); }
+
+bool IIWAFRINode::step() { return app_.step(); }
+
 void IIWAFRINode::run() {
-
-  sun::check_and_set_realtime();
-
+  run_init();
   // repeatedly call the step routine to receive and process FRI packets
   bool success = true;
   while (ros::ok() && success) {

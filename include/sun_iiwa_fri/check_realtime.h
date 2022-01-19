@@ -6,20 +6,30 @@
 #include <pthread.h>
 #include <sched.h>
 
-namespace sun {
+namespace sun::iiwa::fri {
 
-bool check_and_set_realtime() {
-
-  bool ok = false;
+bool check_realtime(){
 
   std::ifstream realtime_file("/sys/kernel/realtime", std::ios::in);
   bool has_realtime = false;
   if (realtime_file.is_open()) {
     realtime_file >> has_realtime;
   }
+
+  return has_realtime;
+
+}
+
+bool set_realtime_SCHED_FIFO(int priority_to_max = 0) {
+
+  bool ok = false;
+
+  bool has_realtime = check_realtime();
+
   if (has_realtime) {
-    const int max_thread_priority = sched_get_priority_max(SCHED_FIFO);
-    if (max_thread_priority != -1) {
+    const int thread_priority = sched_get_priority_max(SCHED_FIFO) - priority_to_max;
+
+    if (thread_priority != -1) {
       // We'll operate on the currently running thread.
       pthread_t this_thread = pthread_self();
 
@@ -27,7 +37,7 @@ bool check_and_set_realtime() {
       struct sched_param params;
 
       // We'll set the priority to the maximum.
-      params.sched_priority = max_thread_priority;
+      params.sched_priority = thread_priority;
 
       int ret = pthread_setschedparam(this_thread, SCHED_FIFO, &params);
       if (ret != 0) {

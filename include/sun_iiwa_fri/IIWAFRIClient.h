@@ -101,6 +101,7 @@ protected:
   // sample time in seconds to be checked against the controller
   // sample time. If -1, no check is performed
   double sample_time_;
+  bool b_use_realtime_;
 
 public:
   /**
@@ -122,6 +123,8 @@ public:
   void updateParameters();
 
   void initPubsSubs();
+
+  void init_realtime();
 
   void spinOnce(const ros::WallDuration &timeout = ros::WallDuration(0.0));
 

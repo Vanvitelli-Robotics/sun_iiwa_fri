@@ -59,6 +59,7 @@ cost of any service and repair.
 */
 #include "sun_iiwa_fri/IIWAFRIClient.h"
 #include "friLBRState.h"
+#include "sun_iiwa_fri/check_realtime.h"
 #include <cstdio>
 #include <cstring>
 
@@ -70,7 +71,6 @@ RosFriClient::RosFriClient(const ros::NodeHandle &nh,
                            const ros::NodeHandle &nh_private)
     : nh_(nh), nh_private_(nh_private) {
   nh_.setCallbackQueue(&cb_queue_);
-  init();
 }
 
 //******************************************************************************
@@ -92,6 +92,7 @@ void RosFriClient::checkSampleTime() {
 void RosFriClient::init() {
   updateParameters();
   initPubsSubs();
+  init_realtime();
 }
 
 void RosFriClient::updateParameters() {
@@ -105,9 +106,9 @@ void RosFriClient::updateParameters() {
   joint_state_frame_id_ = "iiwa";
 
   nh_private_.param("sample_time", sample_time_, -1.0);
+  nh_private_.param("use_realtime", b_use_realtime_, false);
 
-  if(sample_time_ >= 0.0)
-  {
+  if (sample_time_ >= 0.0) {
     std::cout << "[FRI DRIVER] expected sample time " << sample_time_ << "\n";
   }
 }
@@ -127,6 +128,21 @@ void RosFriClient::initPubsSubs() {
 
   joint_state_cmd_sub_ = nh_.subscribe(joint_state_cmd_topic_, 1,
                                        &RosFriClient::joint_state_cmd_cb, this);
+}
+
+void RosFriClient::init_realtime() {
+  if (b_use_realtime_) {
+
+    if (!check_realtime()) {
+      throw std::runtime_error("REALTIME NOT AVAILABLE");
+    }
+
+    if (!set_realtime_SCHED_FIFO()) {
+      throw std::runtime_error("ERROR IN set_realtime_SCHED_FIFO");
+    }
+
+    std::cout << "[FRI DRIVER] REALTIME MODE SCHED_FIFO!\n";
+  }
 }
 
 void RosFriClient::spinOnce(const ros::WallDuration &timeout) {
@@ -175,10 +191,25 @@ void RosFriClient::pubMonitoring() {
   msg->tracking_performance = robotState().getTrackingPerformance();
 
   monitoring_pub_.publish(msg);
+
   if (last_cmd_) {
     sun_iiwa_fri::IIWACommandPtr repub_cmd_msg =
         sun_iiwa_fri::IIWACommandPtr(new sun_iiwa_fri::IIWACommand);
     *repub_cmd_msg = *last_cmd_;
+    repub_cmd_msg->header.stamp = ros::Time::now();
+    joint_cmd_repub_.publish(repub_cmd_msg);
+  }
+  if (!last_cmd_ &&
+      robotState().getSessionState() == ESessionState::MONITORING_READY) {
+    sun_iiwa_fri::IIWACommandPtr repub_cmd_msg =
+        sun_iiwa_fri::IIWACommandPtr(new sun_iiwa_fri::IIWACommand);
+
+    repub_cmd_msg->joint_position.clear();
+    repub_cmd_msg->joint_position.insert(
+        repub_cmd_msg->joint_position.end(),
+        robotState().getCommandedJointPosition(),
+        &robotState()
+             .getCommandedJointPosition()[robotState().NUMBER_OF_JOINTS]);
     repub_cmd_msg->header.stamp = ros::Time::now();
     joint_cmd_repub_.publish(repub_cmd_msg);
   }

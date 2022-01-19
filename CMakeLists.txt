@@ -108,8 +108,8 @@ generate_messages(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES sun_iiwa_fri
-#  CATKIN_DEPENDS other_catkin_pkg
+ LIBRARIES fri_driver_nodelet
+#  CATKIN_DEPENDS roscpp lbr_fri std_msgs sensor_msgs
 #  DEPENDS system_lib
 )
 
@@ -130,6 +130,16 @@ add_library(${PROJECT_NAME}_lib
   src/${PROJECT_NAME}/IIWAFRINode.cpp
 )
 add_dependencies(${PROJECT_NAME}_lib ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+
+add_library(fri_driver_nodelet
+  src/${PROJECT_NAME}/IIWAFRIDriverNodelet.cpp
+)
+add_dependencies(fri_driver_nodelet ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(fri_driver_nodelet
+${PROJECT_NAME}_lib
+${catkin_LIBRARIES}
+)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries

@@ -1,0 +1,9 @@
+<library path="lib/libfri_driver_nodelet">
+  <class name="sun_iiwa_fri/FRIDriverNodelet"
+     type="sun::iiwa::fri::IIWAFRIDriverNodelet"
+     base_class_type="nodelet::Nodelet">
+    <description>
+     Nodelet FRIDriverNodelet
+    </description>  
+    </class>
+</library>
