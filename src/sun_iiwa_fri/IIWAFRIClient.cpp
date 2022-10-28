@@ -70,6 +70,9 @@ using namespace sun::iiwa::fri;
 RosFriClient::RosFriClient(const ros::NodeHandle &nh,
                            const ros::NodeHandle &nh_private)
     : nh_(nh), nh_private_(nh_private) {
+  for (int i = 0; i < IIWA_NUM_JOINTS; i++) {
+    joint_previous_step_[i] = 0.0;
+  }
   nh_.setCallbackQueue(&cb_queue_);
 }
 
@@ -169,6 +172,24 @@ void RosFriClient::spinOnce(const ros::WallDuration &timeout) {
   cb_queue_.callAvailable(timeout);
 }
 
+void RosFriClient::updateVelocity() {
+
+  if (!joint_previous_step_initialized_) {
+    for (int i = 0; i < IIWA_NUM_JOINTS; i++) {
+      joint_previous_step_[i] = robotState().getMeasuredJointPosition()[i];
+    }
+    joint_previous_step_initialized_ = true;
+  }
+
+  for (int i = 0; i < IIWA_NUM_JOINTS; i++) {
+    joint_vel_[i] =
+        (robotState().getMeasuredJointPosition()[i] - joint_previous_step_[i]) /
+        robotState().getSampleTime();
+
+    joint_previous_step_[i] = robotState().getMeasuredJointPosition()[i];
+  }
+}
+
 void RosFriClient::publishAll() {
   pubJointState();
   pubMonitoring();
@@ -252,6 +273,10 @@ void RosFriClient::pubJointState() {
       msg->position.end(), robotState().getMeasuredJointPosition(),
       &robotState().getMeasuredJointPosition()[robotState().NUMBER_OF_JOINTS]);
 
+  msg->velocity.clear();
+  msg->velocity.insert(msg->velocity.end(), joint_vel_.data(),
+                       &joint_vel_[robotState().NUMBER_OF_JOINTS]);
+
   msg->effort.clear();
   msg->effort.insert(
       msg->effort.end(), robotState().getMeasuredTorque(),
@@ -332,6 +357,7 @@ void RosFriClient::monitor() {
   /*                                                                         */
   /***************************************************************************/
 
+  updateVelocity();
   publishAll();
 }
 
@@ -353,6 +379,8 @@ void RosFriClient::waitForCommand() {
 
   initializeLastCmd();
 
+  updateVelocity();
+
   publishAll();
 }
 
@@ -373,6 +401,8 @@ void RosFriClient::command() {
   if (!last_cmd_) {
     initializeLastCmd();
   }
+
+  updateVelocity();
 
   if (filter_) {
     filter_->apply_filter(last_cmd_->joint_position.data());

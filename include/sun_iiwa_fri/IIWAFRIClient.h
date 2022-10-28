@@ -104,6 +104,9 @@ protected:
   std::vector<std::string> joint_names_;
   std::string joint_state_frame_id_;
 
+  std::array<double, IIWA_NUM_JOINTS> joint_previous_step_, joint_vel_;
+  bool joint_previous_step_initialized_ = false;
+
   // sample time in seconds to be checked against the controller
   // sample time. If -1, no check is performed
   double sample_time_;
@@ -137,6 +140,8 @@ public:
   void init_realtime();
 
   void spinOnce(const ros::WallDuration &timeout = ros::WallDuration(0.0));
+
+  void updateVelocity();
 
   void publishAll();
 
